@@ -2,8 +2,10 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 
+DATABASE_FILE = 'mabase_SQLite.db'
+
 def get_db_connection():
-    conn = sqlite3.connect('mabase_SQLite.db')
+    conn = sqlite3.connect(DATABASE_FILE)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
@@ -29,21 +31,20 @@ def consulter_chambres_disponibles():
     st.header("Chambres Disponibles")
     date_debut = st.date_input("Date de début")
     date_fin = st.date_input("Date de fin")
-
+    
     if date_debut and date_fin:
         conn = get_db_connection()
         df = pd.read_sql_query('''
-            SELECT ch.*, tc.Type, h.Ville
+            SELECT ch.*, tc.Type, h.Ville 
             FROM Chambre ch
             JOIN Type_Chambre tc ON ch.Id_Type = tc.Id_Type
             JOIN Hotel h ON ch.Id_Hotel = h.Id_Hotel
             WHERE NOT EXISTS (
-                SELECT 1
+                SELECT 1 
                 FROM Reservation r
                 JOIN Concerner cn ON r.Id_Reservation = cn.Id_Reservation
-                JOIN Chambre c ON cn.Id_Type = c.Id_Type -- Corrected join here
-                WHERE c.Id_Chambre = ch.Id_Chambre
-                AND r.Date_arrivee < ?
+                WHERE cn.Id_Type = ch.Id_Type
+                AND r.Date_arrivee < ? 
                 AND r.Date_depart > ?
             )
         ''', conn, params=(date_fin, date_debut))
@@ -59,16 +60,20 @@ def ajouter_client():
         cp = st.number_input("Code postal", step=1)
         email = st.text_input("Email")
         tel = st.text_input("Téléphone")
+        submitted = st.form_submit_button("Ajouter")
 
-        if st.form_submit_button("Ajouter"):
-            conn = get_db_connection()
-            conn.execute('''
-                INSERT INTO Client (Nom_complet, Adresse, Ville, Code_postal, Email, Numero_telephone)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (nom, adresse, ville, cp, email, tel))
-            conn.commit()
-            conn.close()
-            st.success("Client ajouté !")
+        if submitted:
+            if not nom or not adresse or not ville or not email or not tel:
+                st.error("Tous les champs avec (*) sont obligatoires.")
+            else:
+                conn = get_db_connection()
+                conn.execute('''
+                    INSERT INTO Client (Nom_complet, Adresse, Ville, Code_postal, Email, Numero_telephone)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (nom, adresse, ville, cp, email, tel))
+                conn.commit()
+                conn.close()
+                st.success(f"Client '{nom}' ajouté !")
 
 def ajouter_reservation():
     st.header("Ajouter une Réservation")
